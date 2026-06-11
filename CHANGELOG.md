@@ -2,12 +2,14 @@
 
 ## [Unreleased]
 
-## [0.2.0]
+## [0.2.1]
 
 ### Fixed
 
 - Use KDE's conventional 32-unit SVG canvas and nominal cursor size 24 to
   avoid blurry scalable cursors in Plasma.
+
+## [0.2.0]
 
 ### Changed
 

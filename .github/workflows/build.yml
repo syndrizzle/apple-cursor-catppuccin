@@ -2,74 +2,135 @@ name: Build and Release
 
 on:
   push:
-    paths-ignore:
-      - "**.md"
-      - LICENSE
-      - .github/FUNDING.yml
+    branches:
+      - main
     tags:
-      - 'v*'
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup node
-        uses: actions/setup-node@v4
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
-      - name: Installing Node Dependencies
-        run: |
-          rm -rf node_modules yarn.lock
-          yarn install --frozen-lockfile
-
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: 3.11
+          python-version: "3.11"
 
-      - name: Installing PyPi Dependencies
+      - name: Install dependencies
         run: |
+          npm install --no-package-lock
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
-      - name: Build Cursors
+      - name: Build cursor packages
+        run: npm run build
+
+      - name: Verify packages
+        shell: bash
         run: |
-          npx cbmp --version
-          yarn render
-          clickgen --version
-          ctgen --version
-          yarn build
+          expected=(
+            macOS
+            macOS-White
+            macOS-Catppuccin-Latte-Dark
+            macOS-Catppuccin-Latte
+            macOS-Catppuccin-Frappe-Dark
+            macOS-Catppuccin-Frappe
+            macOS-Catppuccin-Macchiato-Dark
+            macOS-Catppuccin-Macchiato
+            macOS-Catppuccin-Mocha-Dark
+            macOS-Catppuccin-Mocha
+          )
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+          for theme in "${expected[@]}"; do
+            archive="bin/$theme.tar.xz"
+            test -f "$archive"
+            contents="$(tar -tJf "$archive")"
+            grep -q "^$theme/cursors/" <<< "$contents"
+            grep -q "^$theme/cursors_scalable/" <<< "$contents"
+          done
+
+          test "$(find bin -maxdepth 1 -name '*.tar.xz' | wc -l)" -eq 10
+
+      - name: Upload cursor packages
+        uses: actions/upload-artifact@v7
         with:
           name: cursor-packages
-          path: bin/
-          retention-days: 1
+          path: bin/*.tar.xz
+          if-no-files-found: error
+          retention-days: 7
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download cursor packages
+        uses: actions/download-artifact@v8
         with:
           name: cursor-packages
-          path: bin/
+          path: bin
 
-      - name: Create Release
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: |
-            bin/*-Windows.zip
-            bin/macOS-Catppuccin-*.tar.xz
-          bodyFile: CHANGELOG.md
+      - name: Extract release notes
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          version="${VERSION#v}"
+          awk -v version="$version" '
+            $0 == "## [" version "]" {
+              found = 1
+              next
+            }
+            found && /^## / {
+              exit
+            }
+            found {
+              print
+            }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          test -s RELEASE_NOTES.md
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "$TAG" \
+              --notes-file RELEASE_NOTES.md
+            gh release upload "$TAG" bin/*.tar.xz --clobber
+          else
+            gh release create "$TAG" bin/*.tar.xz \
+              --verify-tag \
+              --title "$TAG" \
+              --notes-file RELEASE_NOTES.md
+          fi

@@ -1,15 +1,23 @@
 # Changelog
 
-## [v0.1.1]
+## [Unreleased]
 
-## Added
-- Fixed an issue where windows cursors had wrong assignments, this is a library (`clickgen`) bug, using `fix_inf.py`, we can temporarily patch the inf files to fix that, until the issue is handled by the library.
+## [0.2.0]
+
+### Changed
+
+- Simplified the project to generate Linux themes only.
+- Added scalable SVG cursors for KDE Plasma 6.2 and newer.
+- Restored the standard `macOS` and `macOS-White` Linux themes with scalable
+  SVG cursor support.
 
 ## [v0.1]
 
 ### Added
+
 - Catppuccin theme support with all flavors (Latte, Frappe, Macchiato, Mocha)
 - Dark and Light variants for each flavor.
 
 ### Changed
+
 - Updated build system to support Catppuccin variants

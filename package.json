@@ -1,11 +1,14 @@
 {
+  "name": "apple-cursor-catppuccin",
+  "private": true,
+  "engines": {
+    "node": ">=16.16.0"
+  },
   "dependencies": {
-    "cbmp": "^1.1.1"
+    "cbmp": "1.1.1"
   },
   "scripts": {
     "clean": "rm -rf bin bitmaps themes",
-    "render": "npx cbmp render.json",
-    "build": "bash build.sh",
-    "generate": "python generate_variants.py && npx cbmp render.json && bash build.sh"
+    "build": "bash build.sh"
   }
 }

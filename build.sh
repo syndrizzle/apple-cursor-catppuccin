@@ -1,86 +1,58 @@
-#!/bin/bash
-# A script for preparing binaries of Apple Cursors, created by Abdulkaiz Khatri.
+#!/usr/bin/env bash
 
-version="v2.0.1"
+set -euo pipefail
 
-error() (
-  set -o pipefail
-  "$@" 2> >(sed $'s,.*,\e[31m&\e[m,' >&2)
+readonly VERSION="v2.0.1"
+
+readonly -a THEMES=(
+  "macOS|macOS|#000000|#FFFFFF"
+  "macOS-White|White macOS|#FFFFFF|#000000"
+  "macOS-Catppuccin-Latte-Dark|Catppuccin Latte Dark|#eff1f5|#8839ef"
+  "macOS-Catppuccin-Latte|Catppuccin Latte|#8839ef|#eff1f5"
+  "macOS-Catppuccin-Frappe-Dark|Catppuccin Frappe Dark|#303446|#ca9ee6"
+  "macOS-Catppuccin-Frappe|Catppuccin Frappe|#ca9ee6|#303446"
+  "macOS-Catppuccin-Macchiato-Dark|Catppuccin Macchiato Dark|#24273a|#c6a0f6"
+  "macOS-Catppuccin-Macchiato|Catppuccin Macchiato|#c6a0f6|#24273a"
+  "macOS-Catppuccin-Mocha-Dark|Catppuccin Mocha Dark|#1e1e2e|#cba6f7"
+  "macOS-Catppuccin-Mocha|Catppuccin Mocha|#cba6f7|#1e1e2e"
 )
 
-get_config_file() {
-  local key="${1}"
-  local cfg_file="build.toml"
-
-  if [[ $key == *"Right"* ]]; then
-    cfg_file="build.right.toml"
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf 'Required command not found: %s\n' "$1" >&2
+    exit 127
   fi
-
-  echo $cfg_file
 }
 
-with_version() {
-  local comment="${1}"
-  echo "$comment ($version)"
-}
+require_command npx
+require_command ctgen
+require_command python3
+require_command tar
 
-if ! type -p ctgen >/dev/null; then
-  error ctgen
-  exit 127 # exit program with "command not found" error code
-fi
-
-declare -A names
-names["macOS-Catppuccin-Latte-Dark"]=$(with_version "Catppuccin Latte Dark")
-names["macOS-Catppuccin-Latte"]=$(with_version "Catppuccin Latte")
-names["macOS-Catppuccin-Frappe-Dark"]=$(with_version "Catppuccin Frappe Dark")
-names["macOS-Catppuccin-Frappe"]=$(with_version "Catppuccin Frappe")
-names["macOS-Catppuccin-Macchiato-Dark"]=$(with_version "Catppuccin Macchiato Dark")
-names["macOS-Catppuccin-Macchiato"]=$(with_version "Catppuccin Macchiato")
-names["macOS-Catppuccin-Mocha-Dark"]=$(with_version "Catppuccin Mocha Dark")
-names["macOS-Catppuccin-Mocha"]=$(with_version "Catppuccin Mocha")
-
-# Cleanup old builds
-rm -rf themes bin
-
-# Building Apple XCursor binaries
-for key in "${!names[@]}"; do
-  comment="${names[$key]}"
-  cfg=$(get_config_file key)
-
-  ctgen "configs/x.$cfg" -p x11 -d "bitmaps/$key" -n "$key" -c "$comment XCursors" &
-  PID=$!
-  wait $PID
-done
-
-# Building macOS Windows binaries
-for key in "${!names[@]}"; do
-  comment="${names[$key]}"
-  cfg=$(get_config_file key)
-
-  ctgen "configs/win_rg.$cfg" -d "bitmaps/$key" -n "$key-Regular" -c "$comment Regular Windows Cursors" &
-  ctgen "configs/win_lg.$cfg" -d "bitmaps/$key" -n "$key-Large" -c "$comment Large Windows Cursors" &
-  ctgen "configs/win_xl.$cfg" -d "bitmaps/$key" -n "$key-Extra-Large" -c "$comment Extra Large Windows Cursors" &
-  PID=$!
-  wait $PID
-done
-
-python3 fix_inf.py
-
-# Compressing Binaries
+rm -rf bin bitmaps themes
 mkdir -p bin
-cd themes || exit
 
-for key in "${!names[@]}"; do
-  tar -cJvf "../bin/${key}.tar.xz" "${key}" &
-  PID=$!
-  wait $PID
+for theme in "${THEMES[@]}"; do
+  IFS='|' read -r name comment base_color outline_color <<< "$theme"
+
+  npx --no-install cbmp \
+    -d svg \
+    -o "bitmaps/$name" \
+    -bc "$base_color" \
+    -oc "$outline_color"
+
+  ctgen build.toml \
+    -p x11 \
+    -d "bitmaps/$name" \
+    -n "$name" \
+    -c "$comment ($VERSION) XCursors"
+
+  python3 build_svg_theme.py \
+    --config build.toml \
+    --svg-dir svg \
+    --output-dir "themes/$name/cursors_scalable" \
+    --base-color "$base_color" \
+    --outline-color "$outline_color"
+
+  tar -C themes -cJf "bin/$name.tar.xz" "$name"
 done
-
-# Compressing macOS-*-Windows
-for key in "${!names[@]}"; do
-  zip -rv "../bin/${key}-Windows.zip" "${key}-Regular-Windows" "${key}-Large-Windows" "${key}-Extra-Large-Windows" &
-  PID=$!
-  wait $PID
-done
-
-cd ..

@@ -5,7 +5,7 @@ website = 'https://github.com/ful1e5/apple_cursor'
 
 [config]
 bitmaps_dir = ''   # This config will assigned with `ctgen -d <path>`
-out_dir = '../themes'
+out_dir = 'themes'
 platforms = 'x11'
 
 [cursors]

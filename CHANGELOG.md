@@ -4,6 +4,11 @@
 
 ## [0.2.0]
 
+### Fixed
+
+- Use KDE's conventional 32-unit SVG canvas and nominal cursor size 24 to
+  avoid blurry scalable cursors in Plasma.
+
 ### Changed
 
 - Simplified the project to generate Linux themes only.

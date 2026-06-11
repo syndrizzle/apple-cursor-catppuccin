@@ -30,7 +30,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--base-color", required=True)
     parser.add_argument("--outline-color", required=True)
-    parser.add_argument("--nominal-size", type=int, default=256)
+    parser.add_argument("--canvas-size", type=int, default=32)
+    parser.add_argument("--nominal-size", type=int, default=24)
     return parser.parse_args()
 
 
@@ -68,7 +69,7 @@ def write_svg(
     destination: Path,
     base_color: str,
     outline_color: str,
-    nominal_size: int,
+    canvas_size: int,
 ) -> Tuple[float, float]:
     parser = ElementTree.XMLParser(
         target=ElementTree.TreeBuilder(insert_comments=True)
@@ -79,8 +80,8 @@ def write_svg(
     source_width = parse_dimension(root.attrib["width"], source, "width")
     source_height = parse_dimension(root.attrib["height"], source, "height")
 
-    root.set("width", str(nominal_size))
-    root.set("height", str(nominal_size))
+    root.set("width", str(canvas_size))
+    root.set("height", str(canvas_size))
 
     for element in root.iter():
         for name, value in element.attrib.items():
@@ -117,6 +118,7 @@ def build_cursor(
     fallback: Dict[str, Any],
     base_color: str,
     outline_color: str,
+    canvas_size: int,
     nominal_size: int,
 ) -> None:
     cursor_name = cursor["x11_name"]
@@ -137,15 +139,15 @@ def build_cursor(
             destination,
             base_color,
             outline_color,
-            nominal_size,
+            canvas_size,
         )
         frame = {
             "filename": source.name,
             "hotspot_x": compact_number(
-                hotspot_x * nominal_size / source_width
+                hotspot_x * canvas_size / source_width
             ),
             "hotspot_y": compact_number(
-                hotspot_y * nominal_size / source_height
+                hotspot_y * canvas_size / source_height
             ),
             "nominal_size": nominal_size,
         }
@@ -177,6 +179,8 @@ def build_aliases(
 
 
 def build_theme(args: argparse.Namespace) -> None:
+    if args.canvas_size <= 0:
+        raise ValueError("Canvas size must be positive")
     if args.nominal_size <= 0:
         raise ValueError("Nominal size must be positive")
 
@@ -200,6 +204,7 @@ def build_theme(args: argparse.Namespace) -> None:
             fallback,
             args.base_color,
             args.outline_color,
+            args.canvas_size,
             args.nominal_size,
         )
 

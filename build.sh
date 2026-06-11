@@ -52,7 +52,9 @@ for theme in "${THEMES[@]}"; do
     --svg-dir svg \
     --output-dir "themes/$name/cursors_scalable" \
     --base-color "$base_color" \
-    --outline-color "$outline_color"
+    --outline-color "$outline_color" \
+    --canvas-size 32 \
+    --nominal-size 24
 
   tar -C themes -cJf "bin/$name.tar.xz" "$name"
 done
